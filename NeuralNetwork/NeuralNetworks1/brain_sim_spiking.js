@@ -97,7 +97,7 @@ function Neuron(temp_id) {
 }
 
 function Neuron_connect(neu_from, neu_to, weight){
-	let w = weight == undefined ? OVERLORD_RAND.random() : weight;
+	let w = weight == undefined ? OVERLORD_RAND.random()*2.0-1.0 : weight;
 	neu_from.outgoing.push({
 		"n": neu_to
 	});
@@ -187,6 +187,17 @@ function SmartBoy(conf){
 		}
 	};
 
+	this.shuffleWeights = () => {
+		for(let i = 0;i < this.layers.length;i++){
+			for(let j = 0;j < this.layers[i].length;j++){
+				for(let k = 0;k < this.layers[i][j].incoming.length;k++){
+					this.layers[i][j].incoming[k].w = 
+						OVERLORD_RAND.random()*2.0-1.0;
+				}				
+			}
+		}
+	};
+
 	this.step = () => {
 		this.oracle.timeindex++;
 		let neuronsCheckedSoFar = [];
@@ -213,11 +224,12 @@ function SmartBoy(conf){
 
 		//While there are neurons to fire?
 		for(let k = 0;k < neuronsCheckedSoFar.length;k++){
-			if(true){//neuronsCheckedSoFar[k].potential + neuronsCheckedSoFar[k].bias >= neuronsCheckedSoFar[k].threshold){
+			//if(neuronsCheckedSoFar[k].potential + neuronsCheckedSoFar[k].bias >= neuronsCheckedSoFar[k].threshold){
+			if(neuronsCheckedSoFar[k].potential >= neuronsCheckedSoFar[k].threshold){
 				let spillage = neuronsCheckedSoFar[k].potential - neuronsCheckedSoFar[k].threshold;//TODO <- this could mean something
 
-				neuronsCheckedSoFar[k].output = sigmoid(neuronsCheckedSoFar[k].potential + neuronsCheckedSoFar[k].bias);// + spillage/neuronsCheckedSoFar[k].threshold;//neuronsCheckedSoFar[k].potential / neuronsCheckedSoFar[k].threshold;//1.0;
-				neuronsCheckedSoFar[k]._output = sigmoid_der(neuronsCheckedSoFar[k].potential + neuronsCheckedSoFar[k].bias);
+				neuronsCheckedSoFar[k].output = 1.0;//sigmoid(neuronsCheckedSoFar[k].potential + neuronsCheckedSoFar[k].bias);// + spillage/neuronsCheckedSoFar[k].threshold;//neuronsCheckedSoFar[k].potential / neuronsCheckedSoFar[k].threshold;//1.0;
+				neuronsCheckedSoFar[k]._output = 0.0;//sigmoid_der(neuronsCheckedSoFar[k].potential + neuronsCheckedSoFar[k].bias);
 
 				neuronsCheckedSoFar[k].potential = 0.0;//spillage/2.5;// 0;//+ spillage *0.01? lol maybe
 				neuronsCheckedSoFar[k].timesfired++;
@@ -502,7 +514,7 @@ var app = express();
 var startServer = false;
 
 const fs = require('fs');
-let OVERLORD_RAND = new CustomRandom("snxeaky seed", "adfff");
+let OVERLORD_RAND = new CustomRandom("snxeaky seed1", "addfff");
 
 
 
@@ -516,6 +528,24 @@ var hero2 = new SmartBoy({
 	"oracle_timeindex": 0
 });
 
+//First Layer 2
+
+Neuron_connect(hero2.layers[0][0], hero2.layers[1][0]);
+Neuron_connect(hero2.layers[0][0], hero2.layers[1][1]);
+
+Neuron_connect(hero2.layers[0][1], hero2.layers[1][0]);
+Neuron_connect(hero2.layers[0][1], hero2.layers[1][1]);
+
+Neuron_connect(hero2.layers[1][0], hero2.layers[1][2]);
+Neuron_connect(hero2.layers[1][0], hero2.layers[1][3]);
+Neuron_connect(hero2.layers[1][1], hero2.layers[1][2]);
+Neuron_connect(hero2.layers[1][1], hero2.layers[1][3]);
+
+Neuron_connect(hero2.layers[1][0], hero2.layers[2][0]);
+Neuron_connect(hero2.layers[1][1], hero2.layers[2][0]);
+
+
+/*
 //First layer
 Neuron_connect(hero2.layers[0][0], hero2.layers[1][0]);
 Neuron_connect(hero2.layers[0][0], hero2.layers[1][1]);
@@ -533,16 +563,11 @@ Neuron_connect(hero2.layers[1][2], hero2.layers[1][4]);
 Neuron_connect(hero2.layers[1][2], hero2.layers[1][5]);
 Neuron_connect(hero2.layers[1][3], hero2.layers[1][4]);
 Neuron_connect(hero2.layers[1][3], hero2.layers[1][5]);
-/*
-Neuron_connect(hero2.layers[1][4], hero2.layers[1][0]);
-Neuron_connect(hero2.layers[1][4], hero2.layers[1][1]);
-Neuron_connect(hero2.layers[1][5], hero2.layers[1][0]);
-Neuron_connect(hero2.layers[1][5], hero2.layers[1][1]);
-*/
+
 //Outputs
 Neuron_connect(hero2.layers[1][4], hero2.layers[2][0]);
 Neuron_connect(hero2.layers[1][5], hero2.layers[2][0]);
-
+*/
 
 console.log("Weights before:::");
 hero2.showWeightsOfNet();
@@ -564,27 +589,39 @@ let training_data_for_xor = [
 	{"inputs": [1, 1], "outputs": [0]}
 ];
 
+let training_data_yes_no = [
+	{"inputs": [1, 0], "outputs": [0]},
+	{"inputs": [0, 1], "outputs": [1]}
+];
+
+//training_data_for_xor = training_data_yes_no;
+
 //Firing sequence - 
 //Process of: inputing X amount of times, summing the error, and returning
 //In this case, activate() x 1, step() x 4
 
 function runSequence(ins){
 	hero2.resetFiredCount();
+	hero2.oracle.nexts = [];
 
 	let results = new Array(hero2.layers[2].length);
 	for(let h = 0;h < results.length;h++) results[h] = 0;
-	let primerTime = 3;						//min steps before first possible output
-	let totalThoughtTime = 5 * primerTime;
+	let primerTime = 2;						//min steps before first possible output
+	let totalThoughtTime = primerTime + 1;
 	let outsGathered = 0;
 
 	for(let i = 0;i < totalThoughtTime;i++){
 		hero2.activate(ins);
 		let res = hero2.step();
+		//console.log("thought step------:", i);
+		//console.log(hero2.oracle.nexts);
 		//console.log(res);
 		if(i >= primerTime){
+			//console.log("READY", i);
 			results = res.map(function(x, ind){return x + results[ind];});
 			//console.log(results);
 			outsGathered+=1.0;
+			
 		}
 	}
 
@@ -612,30 +649,46 @@ function trainOurNetwork_V1(tval){
 	console.log('\nTRAINED', trainingRounds, 'rounds :\n');
 }
 
-trainOurNetwork_V1(70000);
+//trainOurNetwork_V1(70000);
 
 
 
-
-
-////////TTTTTTTESSSSSSSSSSSSSTTTTTTTTTTTTTTTT
-////////TTTTTTTESSSSSSSSSSSSSTTTTTTTTTTTTTTTT
-////////TTTTTTTESSSSSSSSSSSSSTTTTTTTTTTTTTTTT
+////////TTTTTTTESTTTTTTT
+////////TTTTTTTESTTTTTTT
+////////TTTTTTTESTTTTTTT
 
 console.log("Weights After:::");
-hero2.showWeightsOfNet();
+//hero2.showWeightsOfNet();
 
-
+function validateOnData(validation_data){
+	let totalErrorInValidation = 0.0;
+	for(let tdset = 0;tdset < validation_data.length;tdset++){
+		let gottenVal = runSequence(validation_data[tdset].inputs);
+		//console.log("got:", gottenVal);
+		//console.log("wanted:", validation_data[tdset].outputs);
+		//console.log("----");
+		totalErrorInValidation += 
+			Math.abs(gottenVal - validation_data[tdset].outputs);
+	}
+	return totalErrorInValidation / validation_data.length;
+}
 console.log('\nXOR________:\n');
-for(let tdset = 0;tdset < training_data_for_xor.length;tdset++){
+let valError = validateOnData(training_data_for_xor);
+console.log("error val", valError);
 
-	let gottenVal = runSequence(training_data_for_xor[tdset].inputs);
 
-	console.log("got:", gottenVal);
-	console.log("wanted:", training_data_for_xor[tdset].outputs);
-	console.log("----");
+let ii = 0;
+while(valError > 0.01 && ii < 1100){
+	hero2.shuffleWeights();
+	valError = validateOnData(training_data_for_xor);
+	//console.log("new weights");
+	//hero2.showWeightsOfNet();
+	console.log(valError);
+	ii++;
 }
 
+console.log("New val:,,,,,,,,", valError);
+hero2.showWeightsOfNet();
 
 
 if(startServer){
